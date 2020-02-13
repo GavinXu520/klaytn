@@ -19,6 +19,9 @@ package reward
 import (
 	"errors"
 	"fmt"
+	"math/big"
+	"strings"
+
 	"github.com/klaytn/klaytn/accounts/abi"
 	"github.com/klaytn/klaytn/blockchain"
 	"github.com/klaytn/klaytn/blockchain/types"
@@ -26,8 +29,6 @@ import (
 	"github.com/klaytn/klaytn/common"
 	"github.com/klaytn/klaytn/contracts/reward/contract"
 	"github.com/klaytn/klaytn/params"
-	"math/big"
-	"strings"
 )
 
 // addressType defined in AddressBook
@@ -196,7 +197,7 @@ func (ac *addressBookConnector) getStakingInfoFromAddressBook(blockNum uint64) (
 		} else {
 			logger.Error("Fail while parsing a result from the addressBook. Use empty staking info", "err", err)
 		}
-		return newEmptyStakingInfo(blockNum), nil
+		return newEmptyStakingInfo(blockNum), err
 	}
 
 	return newStakingInfo(ac.bc, ac.gh, blockNum, nodeAddrs, stakingAddrs, rewardAddrs, KIRAddr, PoCAddr)

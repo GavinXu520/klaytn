@@ -22,9 +22,6 @@ package validator
 
 import (
 	"fmt"
-	"github.com/klaytn/klaytn/common"
-	"github.com/klaytn/klaytn/consensus/istanbul"
-	"github.com/klaytn/klaytn/reward"
 	"math"
 	"math/rand"
 	"reflect"
@@ -33,6 +30,10 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/klaytn/klaytn/common"
+	"github.com/klaytn/klaytn/consensus/istanbul"
+	"github.com/klaytn/klaytn/reward"
 )
 
 const (
@@ -61,7 +62,10 @@ func (val *defaultValidator) Hash() int64 {
 
 func (val *defaultValidator) RewardAddress() common.Address { return common.Address{} }
 func (val *defaultValidator) VotingPower() uint64           { return 1000 }
-func (val *defaultValidator) Weight() uint64                { return 0 }
+func (val *defaultValidator) Weight() uint64 {
+	logger.Error("((12: defualt validator)) Snapshots", "Weight()", 0)
+	return 0
+}
 
 type defaultSet struct {
 	subSize uint64

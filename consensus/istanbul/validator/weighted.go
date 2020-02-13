@@ -23,11 +23,6 @@ package validator
 import (
 	"errors"
 	"fmt"
-	"github.com/klaytn/klaytn/common"
-	"github.com/klaytn/klaytn/consensus"
-	"github.com/klaytn/klaytn/consensus/istanbul"
-	"github.com/klaytn/klaytn/params"
-	"github.com/klaytn/klaytn/reward"
 	"math"
 	"math/rand"
 	"reflect"
@@ -36,6 +31,12 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/klaytn/klaytn/common"
+	"github.com/klaytn/klaytn/consensus"
+	"github.com/klaytn/klaytn/consensus/istanbul"
+	"github.com/klaytn/klaytn/params"
+	"github.com/klaytn/klaytn/reward"
 )
 
 type weightedValidator struct {
@@ -89,6 +90,7 @@ func newWeightedValidator(addr common.Address, reward common.Address, votingpowe
 		weight:      weight,
 	}
 	weightedValidator.SetRewardAddress(reward)
+	logger.Error("((15: new validator)) Snapshots", "Weight()", weightedValidator.Weight())
 	return weightedValidator
 }
 
@@ -101,7 +103,7 @@ type weightedCouncil struct {
 	validatorMu sync.RWMutex
 	selector    istanbul.ProposalSelector
 
-	proposers         []istanbul.Validator
+	proposers         istanbul.Validators
 	proposersBlockNum uint64 // block number when proposers is determined
 
 	stakingInfo *reward.StakingInfo
@@ -178,6 +180,7 @@ func NewWeightedCouncil(addrs []common.Address, rewards []common.Address, voting
 			//	votingPowers[i] = 2
 			//}
 		}
+		logger.Error("((16: new Council)) Snapshots", "Weight()", weights)
 	}
 
 	if len(addrs) != len(rewards) ||
@@ -690,12 +693,14 @@ func calcWeight(weightedValidators []*weightedValidator, stakingAmounts []float6
 			localLogger = localLogger.NewWith(weightedVal.String(), weight)
 		}
 	} else {
+		logger.Error("((4: calc)) Snapshots", "totalStaking", totalStaking, "stakingAmounts", stakingAmounts)
 		for _, weightedVal := range weightedValidators {
+			logger.Error("((4.5: calc)) Snapshots", "weightedVal", weightedVal)
 			atomic.StoreUint64(&weightedVal.weight, 0)
 			localLogger = localLogger.NewWith(weightedVal.String(), 0)
 		}
 	}
-	localLogger.Debug("calculation weight finished")
+	localLogger.Debug("((4)) calculation weight finished")
 }
 
 func (valSet *weightedCouncil) refreshProposers(seed int64, blockNum uint64) {

@@ -24,7 +24,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/hashicorp/golang-lru"
+	"math/big"
+	"time"
+
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/klaytn/klaytn/blockchain/state"
 	"github.com/klaytn/klaytn/blockchain/types"
 	"github.com/klaytn/klaytn/common"
@@ -37,8 +40,6 @@ import (
 	"github.com/klaytn/klaytn/networks/rpc"
 	"github.com/klaytn/klaytn/params"
 	"github.com/klaytn/klaytn/ser/rlp"
-	"math/big"
-	"time"
 )
 
 const (
@@ -373,8 +374,12 @@ func (sb *backend) Finalize(chain consensus.ChainReader, header *types.Header, s
 			logger.Trace(logMsg, "header.Number", header.Number.Uint64(), "node address", sb.address, "rewardbase", header.Rewardbase)
 		}
 
-		if proposer.Weight() != 0 {
-			stakingInfo := sb.GetStakingManager().GetStakingInfo(header.Number.Uint64())
+		logger.Error("((3: before calling)) Snapshots", "Proposer", proposer, "Weight()", proposer.Weight(), "hash", header.Number.Uint64())
+
+		stakingInfo := sb.GetStakingManager().GetStakingInfo(header.Number.Uint64())
+		if sb.GetStakingManager().IsActivated() {
+			//if proposer.Weight() != 0 {
+			//	stakingInfo := sb.GetStakingManager().GetStakingInfo(header.Number.Uint64())
 			if stakingInfo != nil {
 				kirAddr = stakingInfo.KIRAddr
 				pocAddr = stakingInfo.PoCAddr
@@ -600,13 +605,28 @@ func (sb *backend) snapshot(chain consensus.ChainReader, number uint64, hash com
 		// If an in-memory snapshot was found, use that
 		if s, ok := sb.recents.Get(hash); ok {
 			snap = s.(*Snapshot)
+			logger.Error("((1.2: Fetch Recent)) Snapshots", "blockNumber", number, "Proposer", snap.ValSet.GetProposer(), "Weight()", snap.ValSet.GetProposer().Weight(), "hash", hash)
 			break
 		}
+		logger.Error("((1.3: Miss Recent)) Snapshots", "blockNumber", number, "Proposer", "hash", hash)
+
 		// If an on-disk checkpoint snapshot can be found, use that
 		if number%checkpointInterval == 0 {
 			if s, err := loadSnapshot(sb.db, hash); err == nil {
 				logger.Trace("Loaded voting snapshot form disk", "number", number, "hash", hash)
 				snap = s
+
+				header := chain.GetHeaderByHash(hash)
+				parentHeader := chain.GetHeaderByHash(header.ParentHash)
+				parentSnap, ok := sb.recents.Get(parentHeader)
+				if ok {
+					snap.ValSet.CalcProposer(parentSnap.(*Snapshot).ValSet.GetProposer().Address(), 0)
+					logger.Error("((Unable to Calculated))")
+				} else {
+					logger.Error("((Unable to Calc))")
+				}
+
+				logger.Error("((1: from disk)) Snapshots", "blockNumber", number, "Proposer", snap.ValSet.GetProposer(), "Weight()", snap.ValSet.GetProposer().Weight(), "hash", hash)
 				break
 			}
 		}
@@ -634,6 +654,8 @@ func (sb *backend) snapshot(chain consensus.ChainReader, number uint64, hash com
 	if err != nil {
 		return nil, err
 	}
+	logger.Error("((2: Applied)) Snapshots", "blockNumber", number, "Proposer", snap.ValSet.GetProposer(), "Weight()", snap.ValSet.GetProposer().Weight(), "hash", hash)
+
 	if sb.governance.ProposerPolicy() == uint64(istanbul.WeightedRandom) {
 		// Snapshot of block N (Snapshot_N) should contain proposers for N+1 and following blocks.
 		// And proposers for Block N+1 can be calculated from the nearest previous proposersUpdateInterval block.
@@ -660,7 +682,7 @@ func (sb *backend) snapshot(chain consensus.ChainReader, number uint64, hash com
 		if err = snap.store(sb.db); err != nil {
 			return nil, err
 		}
-		logger.Trace("Stored voting snapshot to disk", "number", snap.Number, "hash", snap.Hash)
+		logger.Error("((2.5: Stored)) Stored voting snapshot to disk", "blockNumber", number, "Proposer", snap.ValSet.GetProposer(), "Weight()", snap.ValSet.GetProposer().Weight(), "hash", hash)
 	}
 
 	sb.recents.Add(snap.Hash, snap)

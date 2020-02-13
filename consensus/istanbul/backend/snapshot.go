@@ -23,6 +23,8 @@ package backend
 import (
 	"bytes"
 	"encoding/json"
+	"strconv"
+
 	"github.com/klaytn/klaytn/blockchain/types"
 	"github.com/klaytn/klaytn/common"
 	"github.com/klaytn/klaytn/consensus/istanbul"
@@ -92,7 +94,7 @@ func newSnapshot(gov *governance.Governance, number uint64, hash common.Hash, va
 }
 
 // loadSnapshot loads an existing snapshot from the database.
-func loadSnapshot(db database.DBManager, hash common.Hash) (*Snapshot, error) {
+func loadSnapshot(db database.DBManager, hash common.Hash, n ...int) (*Snapshot, error) {
 	blob, err := db.ReadIstanbulSnapshot(hash)
 	if err != nil {
 		return nil, err
@@ -101,6 +103,11 @@ func loadSnapshot(db database.DBManager, hash common.Hash) (*Snapshot, error) {
 	if err := json.Unmarshal(blob, snap); err != nil {
 		return nil, err
 	}
+	logger.Error("((17: loaded snapshot)) Snapshots", "blockNumber", snap.Number, "Proposer", snap.ValSet.GetProposer(), "Weight()", snap.ValSet.GetProposer().Weight(), "hash", snap.Hash)
+	if len(n) > 0 {
+		logger.Error("((18."+strconv.Itoa(n[0])+": after store)) Snapshots", "blockNumber", snap.Number, "blob", string(blob))
+	}
+
 	return snap, nil
 }
 
@@ -111,7 +118,12 @@ func (s *Snapshot) store(db database.DBManager) error {
 		return err
 	}
 
-	return db.WriteIstanbulSnapshot(s.Hash, blob)
+	logger.Error("((18: before store)) Snapshots", "blockNumber", s.Number, "Proposer", s.ValSet.GetProposer(), "Weight()", s.ValSet.GetProposer().Weight(), "hash", s.Hash)
+	logger.Error("((18: before store)) Snapshots", "blockNumber", s.Number, "blob", string(blob))
+	res := db.WriteIstanbulSnapshot(s.Hash, blob)
+	snap, _ := loadSnapshot(db, s.Hash, 3)
+	logger.Error("((18.5: after store)) Snapshots", "blockNumber", snap.Number, "Proposer", snap.ValSet.GetProposer(), "Weight()", snap.ValSet.GetProposer().Weight(), "hash", snap.Hash)
+	return res
 }
 
 // copy creates a deep copy of the snapshot, though not the individual votes.
@@ -129,6 +141,7 @@ func (s *Snapshot) copy() *Snapshot {
 
 	copy(cpy.Votes, s.Votes)
 	copy(cpy.Tally, s.Tally)
+	logger.Error("((33: after copy)) Snapshots", "blockNumber", s.Number, "Proposer", s.ValSet.GetProposer(), "Weight()", s.ValSet.GetProposer().Weight(), "hash", s.Hash)
 
 	return cpy
 }
@@ -156,8 +169,10 @@ func (s *Snapshot) apply(headers []*types.Header, gov *governance.Governance, ad
 		return nil, errInvalidVotingChain
 	}
 
+	logger.Error("((6: before copy)) Snapshots", "blockNumber", s.Number, "Proposer", s.ValSet.GetProposer(), "Weight()", s.ValSet.GetProposer().Weight(), "hash", s.Hash)
 	// Iterate through the headers and create a new snapshot
 	snap := s.copy()
+	logger.Error("((6.5: after copy)) Snapshots", "blockNumber", s.Number, "Proposer", s.ValSet.GetProposer(), "Weight()", s.ValSet.GetProposer().Weight(), "hash", s.Hash)
 
 	// Copy values which might be changed by governance vote
 	snap.Epoch, snap.Policy, snap.CommitteeSize = getGovernanceValue(gov, snap.Number)
@@ -190,6 +205,7 @@ func (s *Snapshot) apply(headers []*types.Header, gov *governance.Governance, ad
 			snap.Tally = make([]governance.GovernanceTallyItem, 0)
 		}
 	}
+	logger.Error("((7: Header)) Snapshots", "blockNumber", snap.Number, "Proposer", snap.ValSet.GetProposer(), "Weight()", snap.ValSet.GetProposer().Weight(), "hash", snap.Hash)
 	snap.Number += uint64(len(headers))
 	snap.Hash = headers[len(headers)-1].Hash()
 
@@ -201,6 +217,8 @@ func (s *Snapshot) apply(headers []*types.Header, gov *governance.Governance, ad
 
 	gov.SetTotalVotingPower(snap.ValSet.TotalVotingPower())
 	gov.SetMyVotingPower(snap.getMyVotingPower(addr))
+
+	logger.Error("((8: Applied)) Snapshots", "blockNumber", snap.Number, "Proposer", snap.ValSet.GetProposer(), "Weight()", snap.ValSet.GetProposer().Weight(), "hash", snap.Hash)
 
 	return snap, nil
 }
@@ -316,11 +334,13 @@ func (s *Snapshot) UnmarshalJSON(b []byte) error {
 	} else {
 		s.ValSet = validator.NewSubSet(j.Validators, j.Policy, j.SubGroupSize)
 	}
+	logger.Error("((11: unmarshal)) Snapshots", "blockNumber", s.Number, "Proposer", s.ValSet.GetProposer(), "Weight()", s.ValSet.GetProposer().Weight(), "hash", s.Hash)
 	return nil
 }
 
 // Marshal to a json byte array
 func (s *Snapshot) MarshalJSON() ([]byte, error) {
 	j := s.toJSONStruct()
+	logger.Error("((10: marshal)) Snapshots", "blockNumber", s.Number, "Proposer", s.ValSet.GetProposer(), "Weight()", s.ValSet.GetProposer().Weight(), "hash", s.Hash)
 	return json.Marshal(j)
 }

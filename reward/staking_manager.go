@@ -46,6 +46,7 @@ type StakingManager struct {
 	bc           blockChain
 	chainHeadCh  chan blockchain.ChainHeadEvent
 	chainHeadSub event.Subscription
+	isActivated  bool
 }
 
 func NewStakingManager(bc blockChain, gh governanceHelper) *StakingManager {
@@ -55,6 +56,7 @@ func NewStakingManager(bc blockChain, gh governanceHelper) *StakingManager {
 		gh:          gh,
 		bc:          bc,
 		chainHeadCh: make(chan blockchain.ChainHeadEvent, chainHeadChanSize),
+		isActivated: false,
 	}
 }
 
@@ -69,12 +71,19 @@ func (sm *StakingManager) GetStakingInfo(blockNum uint64) *StakingInfo {
 
 	stakingInfo, err := sm.updateStakingCache(stakingBlockNumber)
 	if err != nil {
-		logger.Error("Failed to get stakingInfo", "Block number", blockNum, "number of staking block", stakingBlockNumber, "err", err)
+		if sm.isActivated {
+			logger.Error("Failed to get stakingInfo", "Block number", blockNum, "number of staking block", stakingBlockNumber, "err", err)
+		}
 		return nil
 	}
+	sm.isActivated = true
 
 	logger.Debug("Complete StakingInfoCache update.", "Block number", blockNum, "number of staking block", stakingBlockNumber)
 	return stakingInfo
+}
+
+func (sm *StakingManager) IsActivated() bool {
+	return sm.isActivated
 }
 
 // updateStakingCache updates staking cache with a stakingInfo of a given block number.
