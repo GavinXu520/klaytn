@@ -71,12 +71,9 @@ func (sm *StakingManager) GetStakingInfo(blockNum uint64) *StakingInfo {
 
 	stakingInfo, err := sm.updateStakingCache(stakingBlockNumber)
 	if err != nil {
-		if sm.isActivated {
-			logger.Error("Failed to get stakingInfo", "Block number", blockNum, "number of staking block", stakingBlockNumber, "err", err)
-		}
+		logger.Error("Failed to get stakingInfo", "Block number", blockNum, "number of staking block", stakingBlockNumber, "err", err)
 		return nil
 	}
-	sm.isActivated = true
 
 	logger.Debug("Complete StakingInfoCache update.", "Block number", blockNum, "number of staking block", stakingBlockNumber)
 	return stakingInfo
@@ -92,7 +89,10 @@ func (sm *StakingManager) updateStakingCache(blockNum uint64) (*StakingInfo, err
 	if err != nil {
 		return nil, err
 	}
-
+	if !sm.isActivated {
+		sm.isActivated = true
+		logger.Info("StakingInfo is activated", "blockNum", blockNum)
+	}
 	sm.sic.add(stakingInfo)
 
 	logger.Info("Add a new stakingInfo to the stakingInfoCache", "stakingInfo", stakingInfo)
